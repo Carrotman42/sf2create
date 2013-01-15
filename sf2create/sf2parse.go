@@ -37,6 +37,9 @@ func toint64(dword []byte) int64 {
     return int64((int64(dword[3]) << 24) | (int64(dword[2]) << 16) | (int64(dword[1]) << 8) |int64(dword[0]))
 }
 
+// Dumps the information of an SF2 compatible file from the provided reader into stdout
+// Will panic if there was an error in the format of the file.
+// Note: This reader should be buffered somehow, as many small reads will occur.
 func Dump(in io.Reader) {
     child, newReader, llen := getChunkHeader(in);
     child.dump("", newReader, llen)
