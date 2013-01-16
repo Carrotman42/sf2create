@@ -1,2 +1,9 @@
 
-You read me, good job!
+This is a project aimed at better understanding the SF2 format, aka the format
+that represents a Sound Font for Midi synthesization. The specification for the
+format is found in the AF2_00A files (in a Microsoft Word compatible as well as
+split across two text files).
+
+Right now all that is supported is reading in an SF2 file and dumping the
+contents, but eventually I hope to create a tool to extract the samples from a
+provided SoundFont and even creating SoundFont files from a set of samples.

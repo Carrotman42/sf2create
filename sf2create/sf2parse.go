@@ -6,6 +6,10 @@ import (
     "io"
 )
 
+// Reads a chunk header as a RIFF header plus four more bytes to get the type.
+// It returns a new sFChild that represents the current section, a reader that
+// is limited to the length of the section according to the header that was
+// read, and the length of the section.
 func getChunkHeader(in io.Reader) (sFChild, io.Reader, int64) {
     var header [12]byte;
     if n, _ := io.ReadFull(in, header[:]); n != 12 {
@@ -33,8 +37,9 @@ func getChunkHeader(in io.Reader) (sFChild, io.Reader, int64) {
     panic(fmt.Sprint("Invalid header type: '", string(header[:4]), "'"))
 }
 
+// Converts a slice of 4 bytes into an int64 using little-endian decoding
 func toint64(dword []byte) int64 {
-    return int64((int64(dword[3]) << 24) | (int64(dword[2]) << 16) | (int64(dword[1]) << 8) |int64(dword[0]))
+    return (int64(dword[3]) << 24) | (int64(dword[2]) << 16) | (int64(dword[1]) << 8) |int64(dword[0])
 }
 
 // Dumps the information of an SF2 compatible file from the provided reader into stdout
@@ -45,6 +50,8 @@ func Dump(in io.Reader) {
     child.dump("", newReader, llen)
 }
 
+// Skips the given number of bytes on the reader, printing out an error message
+// if there wasn't enough to read from the reader.
 func skip(in io.Reader, llen int64) {
     var skipbuf [1024*4]byte;
     for llen > 0 {
@@ -65,10 +72,15 @@ func skip(in io.Reader, llen int64) {
     }
 }
 
+// Represents a node in the SF2 file. Right now it only requires support for
+// dumping the file to stdout
 type sFChild interface {
+    // Dump any information retrievable for the section the sFChild represents
+    // with the given indent
     dump(indent string, in io.Reader, llen int64);
 }
 
+// Represents all children that can be represented following a RIFF header
 var riffChildren map[[4]byte]sFChild = map[[4]byte]sFChild {
     [4]byte{'s','f','b','k'}:root{},
 };
@@ -86,12 +98,15 @@ func (r root) dump(indent string, in io.Reader, llen int64) {
     }
 }
 
+// Represents all children that can be represented following a LIST header
+// AKA "Level 1" nodes
 var listChildren map[[4]byte]sFChild = map[[4]byte]sFChild {
     [4]byte{'I','N','F','O'}:info{},
     [4]byte{'s','d','t','a'}:sdta{},
     [4]byte{'p','d','t','a'}:pdta{},
 };
 
+// Provides common functionality for the Level 1 nodes
 func doLevel1Dump(desc string, indent string, in io.Reader) {
     fmt.Println(indent, "Got to ", desc, " section!")
     for {
@@ -113,6 +128,7 @@ func doLevel1Dump(desc string, indent string, in io.Reader) {
 
 }
 
+// Finds and returns a 0 terminated string in the provided bytes
 func get0TermString(b []byte) string {
     var i int
     var v byte
@@ -125,6 +141,7 @@ func get0TermString(b []byte) string {
     return string(b[:i])
 }
 
+// Reads as much as it can from a given reader, returning the data as a string
 func readFullString(in io.Reader) string {
     var buf [1024]byte
     ret := ""
@@ -153,6 +170,8 @@ func (p pdta) dump(indent string, in io.Reader, llen int64) {
     doLevel1Dump("pdta", indent, in);
 }
 
+// Represents all Level 2 nodes. They are sorted here by the parent node
+// to which they belong.
 var subchunks map[[4]byte]sFChild = map[[4]byte]sFChild {
     // From the INFO chunk
     [4]byte{'i','f','i','l'}:ifil{},
@@ -178,7 +197,10 @@ var subchunks map[[4]byte]sFChild = map[[4]byte]sFChild {
     [4]byte{'s','h','d','r'}:shdr{},
 };
 
-// INFO chunk subchunks
+// INFO chunk subchunks. Most of these deal with, as could be guessed,
+// information about the SoundFont
+
+
 func getVersion(in io.Reader) (major, minor uint16) {
     var buf [4]byte
     if n, err := io.ReadFull(in, buf[:]); n != 4 {
@@ -246,7 +268,8 @@ func (i irom) dump(indent string, in io.Reader, llen int64) {
 }
 
 
-// From the pdta chunk
+// From the pdta chunk. These deal with the contents of the SoundFont,
+// including descriptions of instruments, generators, presets, and samples.
 
 type phdr struct{}
 func (i phdr) dump(indent string, in io.Reader, llen int64) {
